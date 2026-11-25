@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Diagnostics;
 
 class Program
 {
@@ -20,6 +21,7 @@ class Program
     [DllImport("dxva2.dll")] static extern bool SetVCPFeature(IntPtr h, byte code, uint val);
 
     const byte VCP_MODE = 0xDC;
+    const byte VCP_AUTO = 0xD8;
     const byte VCP_INSTANT = 0xD5;
     const byte VCP_BLUR = 0x4D;
     const byte VCP_AREA = 0x4E;
@@ -28,11 +30,14 @@ class Program
     const byte VCP_DISPMODE = 0x86;
 
     const uint MODE_STANDARD = 0;
+    const uint AUTO_OFF = 4;
     const uint INSTANT_ON = 1;
     const uint BLUR_ON = 1;
     const uint AMA_HIGH = 1;
     const uint DISPMODE_FULL = 2;
+
     const int POLL_MS = 700;
+    const int AUTO_EVERY = 5;
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
     static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
@@ -40,6 +45,7 @@ class Program
     static readonly string[] PROFILE_NAME = { "FPS nitido 1.00ms", "Dia 1.33ms", "Claro 1.67ms" };
 
     static readonly string logPath = Path.Combine(Path.GetTempPath(), "xlkeeper.log");
+    static readonly string pausePath = Path.Combine(Path.GetTempPath(), "xlkeeper.pause");
 
     static void Log(string msg)
     {
@@ -101,28 +107,58 @@ class Program
     {
         Log("iniciado  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
-        int fails = 0;
+        int fails = 0, cycle = 0, stuck = 0;
+        var sw = new Stopwatch();
 
         while (true)
         {
+            sw.Restart();
+
             if (h == IntPtr.Zero)
             {
                 h = Open();
                 if (h == IntPtr.Zero) { Thread.Sleep(5000); continue; }
             }
 
+            if (File.Exists(pausePath)) { Thread.Sleep(POLL_MS); continue; }
+
             uint cur;
             if (Read(h, VCP_MODE, out cur))
             {
                 fails = 0;
-                if (cur != MODE_STANDARD) ApplyPreset(h, cur);
+
+                if (cur != MODE_STANDARD)
+                {
+                    ApplyPreset(h, cur);
+
+                    uint again;
+                    if (Read(h, VCP_MODE, out again) && again != MODE_STANDARD)
+                    {
+                        if (++stuck > 3) { Log("nao consegui restaurar (preso em " + again + ")"); Thread.Sleep(3000); stuck = 0; }
+                    }
+                    else stuck = 0;
+                }
+
+                if (cycle % AUTO_EVERY == 0)
+                {
+                    uint a;
+                    if (Read(h, VCP_AUTO, out a) && a != AUTO_OFF)
+                    {
+                        Log("auto mode " + a + " -> off");
+                        SetVCPFeature(h, VCP_AUTO, 0);
+                    }
+                }
             }
             else
             {
                 if (++fails > 5) { h = IntPtr.Zero; fails = 0; Log("handle perdido, reabrindo"); }
             }
 
-            Thread.Sleep(POLL_MS);
+            cycle++;
+
+            int remaining = POLL_MS - (int)sw.ElapsedMilliseconds;
+            if (remaining < 50) remaining = 50;
+            Thread.Sleep(remaining);
         }
     }
 }
