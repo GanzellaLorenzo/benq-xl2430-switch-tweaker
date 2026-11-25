@@ -126,7 +126,8 @@ class Program
     {
         Log("iniciado  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
-        int fails = 0, cycle = 0, stuck = 0, reopens = 0;
+        int fails = 0, cycle = 0, stuck = 0;
+        int retryAt = 0;
         var sw = new Stopwatch();
 
         while (true)
@@ -135,8 +136,17 @@ class Program
 
             if (h == IntPtr.Zero)
             {
+                // Non-blocking retry: the loop keeps ticking at POLL_MS so a
+                // button press is noticed as soon as the panel answers again.
+                if (Environment.TickCount < retryAt) { Thread.Sleep(POLL_MS); continue; }
                 h = Open();
-                if (h == IntPtr.Zero) { Thread.Sleep(5000); continue; }
+                if (h == IntPtr.Zero)
+                {
+                    retryAt = Environment.TickCount + 5000;
+                    Thread.Sleep(POLL_MS);
+                    continue;
+                }
+                Log("conexao DDC restabelecida");
             }
 
             if (File.Exists(pausePath)) { Thread.Sleep(POLL_MS); continue; }
@@ -145,7 +155,6 @@ class Program
             if (Read(h, VCP_MODE, out cur))
             {
                 fails = 0;
-                reopens = 0;
 
                 if (cur != MODE_STANDARD)
                 {
@@ -176,13 +185,8 @@ class Program
                     Close(h);
                     h = IntPtr.Zero;
                     fails = 0;
-
-                    if (++reopens > 3)
-                    {
-                        Log("monitor nao responde DDC (standby?), aguardando 30s");
-                        Thread.Sleep(30000);
-                        reopens = 0;
-                    }
+                    retryAt = Environment.TickCount + 3000;
+                    Log("monitor nao responde DDC (standby?), tentando de novo em 3s");
                 }
             }
 
