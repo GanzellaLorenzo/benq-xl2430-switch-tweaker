@@ -41,7 +41,7 @@ buffering while still reporting Instant Mode as ON.
 | `0x16` | Video gain: Red | `99` |
 | `0x18` | Video gain: Green | `100` |
 | `0x1A` | Video gain: Blue | `99` |
-| `0x72` | Gamma | `160` (max 160) |
+| `0x72` | Gamma | `80`=1 · `100`=2 · `120`=3 · `140`=4 · `160`=5 |
 | `0x7A` | Black eQualizer *(likely)* | `0` (max 20) |
 | `0x87` | Sharpness | `5` (max 10) |
 | `0x89` | Color Vibrance | `10` (max 20) |
@@ -107,3 +107,24 @@ Two warnings from experience:
    requests while the OSD or the factory menu is open.
 2. **`0x52` is read-only.** It reports the id of the last feature that changed.
    Seeing it move is expected and means nothing.
+
+---
+
+## Gamma encoding
+
+`0x72` uses a linear scale, one step per OSD preset:
+
+| OSD | `0x72` |
+|---|---|
+| 1 | 80 |
+| 2 | 100 |
+| 3 | **120** (factory default) |
+| 4 | 140 |
+| 5 | **160** |
+
+The presets push this to **160 (gamma 5)**. That happens to be the right value
+on this panel at high refresh — the 24" AUO loses gamma as the refresh rises, so
+gamma 5 at 110 Hz reads closer to 2.2 than the factory gamma 3 does. The keeper
+reasserts 160 so it cannot drift back.
+
+If you prefer a different gamma, change `GAMMA_5` in the source.

@@ -28,6 +28,7 @@ class Program
     const byte VCP_AREA = 0x4E;
     const byte VCP_INTENSITY = 0x4F;
     const byte VCP_AMA = 0xF0;
+    const byte VCP_GAMMA = 0x72;
     const byte VCP_DISPMODE = 0x86;
 
     const uint MODE_STANDARD = 0;
@@ -36,6 +37,7 @@ class Program
     const uint BLUR_ON = 1;
     const uint AMA_HIGH = 1;
     const uint DISPMODE_FULL = 2;
+    const uint GAMMA_5 = 160;
 
     const int POLL_MS = 700;
     const int AUTO_EVERY = 5;
@@ -106,8 +108,9 @@ class Program
 
         SetVCPFeature(h, VCP_AMA, AMA_HIGH);
         SetVCPFeature(h, VCP_DISPMODE, DISPMODE_FULL);
+        SetVCPFeature(h, VCP_GAMMA, GAMMA_5);
 
-        Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full");
+        Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full Gamma5");
     }
 
     static void Main()
