@@ -43,6 +43,7 @@ class Program
     const int AUTO_EVERY = 5;
     const int SETTLE_MS = 500;
     const int SECOND_RELOCK_MS = 25000;   // o driver termina de aplicar o modo depois do logon
+    const int FAILS_TO_ARM = 21;          // ~15 s de DDC caido antes de armar relock
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
     static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
@@ -176,7 +177,8 @@ class Program
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
         int retryAt = 0, secondRelockAt = 0;
-        bool needRelock = true;   // primeira conexao tambem relocka
+        bool needRelock = true;      // primeira conexao tambem relocka
+        bool startupRelock = true;   // so o primeiro relock do processo pede confirmacao
         var sw = new Stopwatch();
 
         while (true)
@@ -208,13 +210,17 @@ class Program
                     Thread.Sleep(SETTLE_MS);
                     RestoreState(h, 0, true);
                     needRelock = false;
-                    secondRelockAt = Environment.TickCount + SECOND_RELOCK_MS;
-                    Log("relock concluido");
 
-                    // No boot o driver ainda pode aplicar o modo depois do logon e
-                    // travar o scaler de novo. Um segundo pulso um pouco depois
-                    // cobre essa janela. Depois de um wake isso raramente e preciso,
-                    // mas o custo e de uma vez so.
+                    // Confirmacao apenas no boot. Depois de um wake o driver nao
+                    // reaplica nada, e um segundo pulso cairia no meio de uma
+                    // partida sem motivo.
+                    if (startupRelock)
+                    {
+                        startupRelock = false;
+                        secondRelockAt = Environment.TickCount + SECOND_RELOCK_MS;
+                    }
+
+                    Log("relock concluido");
                 }
                 else if (secondRelockAt != 0 && Environment.TickCount >= secondRelockAt)
                 {
@@ -247,14 +253,14 @@ class Program
             }
             else
             {
-                if (++fails > 5)
+                if (++fails > FAILS_TO_ARM)
                 {
                     Close(h);
                     h = IntPtr.Zero;
                     fails = 0;
                     retryAt = Environment.TickCount + 3000;
                     needRelock = true;
-                    Log("monitor nao responde DDC (standby?), tentando de novo em 3s");
+                    Log("DDC caido por ~15s (standby?), armando relock");
                 }
             }
 

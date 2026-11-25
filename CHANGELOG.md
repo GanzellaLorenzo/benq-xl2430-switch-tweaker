@@ -26,10 +26,16 @@ afternoon, so the version numbers track the actual order of discoveries.
   no wake. Resultado: aperto de botão em 0,90 s (era 1,9 s no original) e wake
   em 4,9 s.
 
-- **Segundo relock 25 s depois.** No boot o driver de vídeo ainda aplica o modo
-  depois do logon, e isso trava o scaler de novo logo após o primeiro relock.
-  Um segundo pulso 25 s depois cobre essa janela. Reportado como "o PC às vezes
-  inicia com a imagem dupla".
+- **Segundo relock 25 s depois, só no boot.** No boot o driver de vídeo ainda
+  aplica o modo depois do logon, e isso trava o scaler de novo logo após o
+  primeiro relock. Um segundo pulso 25 s depois cobre essa janela. Ele **não**
+  roda depois de um wake: acordar o monitor e começar a jogar não pode levar um
+  pulso no meio da partida.
+
+- **Armar só depois de ~15 s de DDC caído** (`FAILS_TO_ARM = 21`, antes eram 5).
+  Um jogo que troca de resolução ao abrir derruba o DDC por 2–3 s; com o
+  limiar antigo isso disparava um relock à toa. Com 15 s, só standby de verdade
+  arma. Durante o jogo o keeper fica só lendo — nunca escreve.
 
 ## v8
 

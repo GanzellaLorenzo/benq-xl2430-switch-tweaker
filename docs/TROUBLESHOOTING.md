@@ -36,6 +36,13 @@ driver applies the display mode some seconds after logon, which can latch the
 scaler again right after the first relock. If the machine still starts doubled,
 the second pulse is too early — raise `SECOND_RELOCK_MS`.
 
+That confirmation pulse runs **only once per process start**, never after a
+wake, so waking the monitor and playing a game does not get interrupted.
+
+The relock arms only after **~15 s of continuous DDC failure** (`FAILS_TO_ARM`).
+A game that changes resolution on launch drops DDC for two or three seconds and
+must not trigger anything. A real standby lasts minutes.
+
 ---
 
 ## Backlight shuts off
