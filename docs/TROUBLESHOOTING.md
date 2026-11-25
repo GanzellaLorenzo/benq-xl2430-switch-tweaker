@@ -12,15 +12,24 @@ Cause: **Instant Mode is stuck.** The flag still reads `ON` (`0xD5 = 1`) but the
 scaler has fallen back to frame buffering. With a large vertical total the
 buffered frame shows through.
 
+This is **by far the most common way to hit it**: the monitor goes to standby
+(Windows display timeout, power button, cable replug) and comes back with the
+scanout latched in an intermediate state. The flag still reads `ON`, so software
+cannot see the problem — only an edge fixes it.
+
 Fix, in order:
 
 1. `Picture → Instant Mode` → **OFF**, wait, → **ON**. This alone fixes it.
 2. If it returns after pressing an S-Switch button, the keeper is not running.
-3. If the keeper is running and it still returns, increase the pause after the
-   pulse in `ApplyPreset` (currently 260 ms) — some panels take longer to
-   re-lock.
+3. If it returns after wake and the keeper is running, check the log for
+   `monitor voltou -> relock do scanout`. If it is missing, the DDC channel
+   never dropped, so the keeper never armed — pause it and toggle Instant Mode
+   by hand.
 
-The keeper automates step 1 on every preset restore.
+The keeper handles this automatically: when DDC stops answering it arms
+`needRelock`, and on the first successful read after that it waits 900 ms,
+pulses Instant Mode and reasserts the profile. Measured at 2.0 s from wake to
+correct image.
 
 ---
 

@@ -5,7 +5,19 @@ afternoon, so the version numbers track the actual order of discoveries.
 
 ---
 
-## v8 — final
+## v9
+
+- **Re-lock automático depois do wake.** O monitor entra em standby e volta com o
+  scanout travado (imagem dupla, imune a desligar o Blur Reduction). Ao detectar
+  que o DDC voltou, o keeper aplica o pulso do Instant Mode sem intervenção.
+  Medido: 2,0 s do wake até a imagem correta.
+- **Leitura antes de escrita** (`SetIfDiffers`). Leitura não pisca, escrita sim.
+  Isso corta as piscadas de 5–6 para 2 por aperto, o tempo de 1,9 s para 1,6 s
+  e os ciclos de NVRAM de 11 para 3.
+- `needRelock` também arma no primeiro start, então o logon já corrige um
+  estado herdado de um boot anterior.
+
+## v8
 
 - Reassert **AMA High** (`0xF0 = 1`) and **Display Mode Full** (`0x86 = 2`) on
   every profile. Both are part of the state the presets clobber.

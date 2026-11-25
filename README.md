@@ -40,12 +40,33 @@ The monitor exposes its picture mode over DDC/CI as **VCP `0xDC`**:
 
 ```
 poll 0xDC every 700 ms
-  if != 0  →  write 0
+  if != 0  →  restore Standard
               pulse Instant Mode (0xD5: 0 → 1)   ← this is what unsticks the scaler
-              write Area / Intensity for that button
-              write AMA High (0xF0 = 1)
-              write Display Mode Full (0x86 = 2)
+              set Area / Intensity for that button
+              set AMA High (0xF0 = 1)
+              set Display Mode Full (0x86 = 2)
+              set Gamma 5 (0x72 = 160)
+
+DDC stopped answering
+  arm "needs relock"
+
+DDC answers again (monitor woke up)
+  wait 900 ms → same restore, profile 1
 ```
+
+Every write is preceded by a read (`SetIfDiffers`). Reads never flicker, writes
+do — this is what keeps the flicker count at two instead of six.
+
+### Wake from sleep
+
+The monitor comes back from standby with the scanout latched in a half-buffered
+state: **permanent double image that survives turning Blur Reduction off**, and
+that only an Instant Mode edge clears. Nothing in Windows reports it, and the
+`0xD5` flag keeps reading `1`.
+
+The watchdog detects it because the DDC channel drops while the panel is asleep,
+arms itself, and re-locks on the first successful read. Measured at **2.0 s**
+from wake to correct image, unattended.
 
 The button press still happens. It just gets undone — and turned into *your* profile.
 

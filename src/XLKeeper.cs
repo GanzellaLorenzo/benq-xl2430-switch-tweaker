@@ -28,8 +28,8 @@ class Program
     const byte VCP_AREA = 0x4E;
     const byte VCP_INTENSITY = 0x4F;
     const byte VCP_AMA = 0xF0;
-    const byte VCP_GAMMA = 0x72;
     const byte VCP_DISPMODE = 0x86;
+    const byte VCP_GAMMA = 0x72;
 
     const uint MODE_STANDARD = 0;
     const uint AUTO_OFF = 4;
@@ -41,6 +41,7 @@ class Program
 
     const int POLL_MS = 700;
     const int AUTO_EVERY = 5;
+    const int SETTLE_MS = 900;
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
     static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
@@ -83,36 +84,54 @@ class Program
         return GetVCPFeatureAndVCPFeatureReply(h, code, out t, out cur, out m);
     }
 
+    // Reads never flicker; writes do. So only write when the value is wrong.
+    static void SetIfDiffers(IntPtr h, byte code, uint want)
+    {
+        uint cur;
+        if (Read(h, code, out cur) && cur == want) return;
+        SetVCPFeature(h, code, want);
+    }
+
+    // The whole reason this program exists. Writing 1 on a register that already
+    // reads 1 is a no-op for the firmware, so the edge 0 -> 1 is mandatory.
+    static void PulseInstant(IntPtr h)
+    {
+        SetVCPFeature(h, VCP_INSTANT, 0);
+        Thread.Sleep(400);
+        SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
+    }
+
+    static void RestoreState(IntPtr h, int idx)
+    {
+        uint mode;
+        if (Read(h, VCP_MODE, out mode) && mode != MODE_STANDARD)
+        {
+            SetVCPFeature(h, VCP_MODE, MODE_STANDARD);
+            Thread.Sleep(180);
+        }
+
+        PulseInstant(h);
+        Thread.Sleep(120);
+
+        SetIfDiffers(h, VCP_BLUR, BLUR_ON);
+        SetIfDiffers(h, VCP_AREA, PROFILE_AREA[idx]);
+        SetIfDiffers(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
+        SetIfDiffers(h, VCP_AMA, AMA_HIGH);
+        SetIfDiffers(h, VCP_DISPMODE, DISPMODE_FULL);
+        SetIfDiffers(h, VCP_GAMMA, GAMMA_5);
+    }
+
     static void ApplyPreset(IntPtr h, uint mode)
     {
         int idx = (int)mode - 24;
         if (idx < 0 || idx > 2) { Log("preset desconhecido " + mode + " -> perfil 1"); idx = 0; }
 
         Log("botao " + (idx + 1) + " -> " + PROFILE_NAME[idx]);
-
-        SetVCPFeature(h, VCP_MODE, MODE_STANDARD);
-        Thread.Sleep(180);
-        SetVCPFeature(h, VCP_INSTANT, 0);
-        Thread.Sleep(260);
-        SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
-        Thread.Sleep(500);
-
-        SetVCPFeature(h, VCP_BLUR, BLUR_ON);
-        Thread.Sleep(100);
-
-        SetVCPFeature(h, VCP_AREA, PROFILE_AREA[idx]);
-        SetVCPFeature(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
-        Thread.Sleep(200);
-        SetVCPFeature(h, VCP_AREA, PROFILE_AREA[idx]);
-        SetVCPFeature(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
-
-        SetVCPFeature(h, VCP_AMA, AMA_HIGH);
-        SetVCPFeature(h, VCP_DISPMODE, DISPMODE_FULL);
-        SetVCPFeature(h, VCP_GAMMA, GAMMA_5);
-
+        RestoreState(h, idx);
         Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full Gamma5");
     }
 
+    [STAThread]
     static void Main()
     {
         bool created;
@@ -120,17 +139,17 @@ class Program
         {
             if (!created) { Log("ja existe uma instancia"); return; }
             try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
-
             Run();
         }
     }
 
     static void Run()
     {
-        Log("iniciado  poll=" + POLL_MS + "ms");
+        Log("iniciado v9  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
         int retryAt = 0;
+        bool needRelock = true;   // primeira conexao tambem relocka
         var sw = new Stopwatch();
 
         while (true)
@@ -139,8 +158,6 @@ class Program
 
             if (h == IntPtr.Zero)
             {
-                // Non-blocking retry: the loop keeps ticking at POLL_MS so a
-                // button press is noticed as soon as the panel answers again.
                 if (Environment.TickCount < retryAt) { Thread.Sleep(POLL_MS); continue; }
                 h = Open();
                 if (h == IntPtr.Zero)
@@ -149,7 +166,6 @@ class Program
                     Thread.Sleep(POLL_MS);
                     continue;
                 }
-                Log("conexao DDC restabelecida");
             }
 
             if (File.Exists(pausePath)) { Thread.Sleep(POLL_MS); continue; }
@@ -159,7 +175,15 @@ class Program
             {
                 fails = 0;
 
-                if (cur != MODE_STANDARD)
+                if (needRelock)
+                {
+                    Log("monitor voltou -> relock do scanout");
+                    Thread.Sleep(SETTLE_MS);
+                    RestoreState(h, 0);
+                    needRelock = false;
+                    Log("relock concluido");
+                }
+                else if (cur != MODE_STANDARD)
                 {
                     ApplyPreset(h, cur);
 
@@ -189,6 +213,7 @@ class Program
                     h = IntPtr.Zero;
                     fails = 0;
                     retryAt = Environment.TickCount + 3000;
+                    needRelock = true;
                     Log("monitor nao responde DDC (standby?), tentando de novo em 3s");
                 }
             }
