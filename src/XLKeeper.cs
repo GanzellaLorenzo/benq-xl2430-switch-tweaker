@@ -24,10 +24,14 @@ class Program
     const byte VCP_BLUR = 0x4D;
     const byte VCP_AREA = 0x4E;
     const byte VCP_INTENSITY = 0x4F;
+    const byte VCP_AMA = 0xF0;
+    const byte VCP_DISPMODE = 0x86;
 
     const uint MODE_STANDARD = 0;
     const uint INSTANT_ON = 1;
     const uint BLUR_ON = 1;
+    const uint AMA_HIGH = 1;
+    const uint DISPMODE_FULL = 2;
     const int POLL_MS = 700;
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
@@ -87,7 +91,10 @@ class Program
         SetVCPFeature(h, VCP_AREA, PROFILE_AREA[idx]);
         SetVCPFeature(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
 
-        Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx]);
+        SetVCPFeature(h, VCP_AMA, AMA_HIGH);
+        SetVCPFeature(h, VCP_DISPMODE, DISPMODE_FULL);
+
+        Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full");
     }
 
     static void Main()
