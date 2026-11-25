@@ -20,7 +20,9 @@ class Program
     [DllImport("dxva2.dll")] static extern bool SetVCPFeature(IntPtr h, byte code, uint val);
 
     const byte VCP_MODE = 0xDC;
+    const byte VCP_INSTANT = 0xD5;
     const uint MODE_STANDARD = 0;
+    const uint INSTANT_ON = 1;
     const int POLL_MS = 700;
 
     static readonly string logPath = Path.Combine(Path.GetTempPath(), "xlkeeper.log");
@@ -72,8 +74,12 @@ class Program
                 fails = 0;
                 if (cur != MODE_STANDARD)
                 {
-                    Log("preset " + cur + " detectado -> Standard");
+                    Log("preset " + cur + " detectado -> Standard + pulso Instant Mode");
                     SetVCPFeature(h, VCP_MODE, MODE_STANDARD);
+                    Thread.Sleep(180);
+                    SetVCPFeature(h, VCP_INSTANT, 0);
+                    Thread.Sleep(260);
+                    SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
                 }
             }
             else
