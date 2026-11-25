@@ -17,6 +17,7 @@ class Program
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
     [DllImport("dxva2.dll")] static extern bool GetNumberOfPhysicalMonitorsFromHMONITOR(IntPtr h, out uint n);
     [DllImport("dxva2.dll")] static extern bool GetPhysicalMonitorsFromHMONITOR(IntPtr h, uint n, [Out] PHYSICAL_MONITOR[] a);
+    [DllImport("dxva2.dll")] static extern bool DestroyPhysicalMonitor(IntPtr h);
     [DllImport("dxva2.dll")] static extern bool GetVCPFeatureAndVCPFeatureReply(IntPtr h, byte code, out uint type, out uint cur, out uint max);
     [DllImport("dxva2.dll")] static extern bool SetVCPFeature(IntPtr h, byte code, uint val);
 
@@ -65,7 +66,13 @@ class Program
         if (!GetNumberOfPhysicalMonitorsFromHMONITOR(hMon, out n) || n == 0) return IntPtr.Zero;
         var arr = new PHYSICAL_MONITOR[n];
         if (!GetPhysicalMonitorsFromHMONITOR(hMon, n, arr)) return IntPtr.Zero;
+        for (uint i = 1; i < n; i++) DestroyPhysicalMonitor(arr[i].hPhysicalMonitor);
         return arr[0].hPhysicalMonitor;
+    }
+
+    static void Close(IntPtr h)
+    {
+        if (h != IntPtr.Zero) DestroyPhysicalMonitor(h);
     }
 
     static bool Read(IntPtr h, byte code, out uint cur)
@@ -119,7 +126,7 @@ class Program
     {
         Log("iniciado  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
-        int fails = 0, cycle = 0, stuck = 0;
+        int fails = 0, cycle = 0, stuck = 0, reopens = 0;
         var sw = new Stopwatch();
 
         while (true)
@@ -138,6 +145,7 @@ class Program
             if (Read(h, VCP_MODE, out cur))
             {
                 fails = 0;
+                reopens = 0;
 
                 if (cur != MODE_STANDARD)
                 {
@@ -163,7 +171,19 @@ class Program
             }
             else
             {
-                if (++fails > 5) { h = IntPtr.Zero; fails = 0; Log("handle perdido, reabrindo"); }
+                if (++fails > 5)
+                {
+                    Close(h);
+                    h = IntPtr.Zero;
+                    fails = 0;
+
+                    if (++reopens > 3)
+                    {
+                        Log("monitor nao responde DDC (standby?), aguardando 30s");
+                        Thread.Sleep(30000);
+                        reopens = 0;
+                    }
+                }
             }
 
             cycle++;
