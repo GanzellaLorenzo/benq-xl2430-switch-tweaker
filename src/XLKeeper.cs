@@ -105,6 +105,18 @@ class Program
 
     static void Main()
     {
+        bool created;
+        using (var mutex = new Mutex(true, "Global\\XLStandardKeeper", out created))
+        {
+            if (!created) { Log("ja existe uma instancia"); return; }
+            try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
+
+            Run();
+        }
+    }
+
+    static void Run()
+    {
         Log("iniciado  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
