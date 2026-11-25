@@ -73,7 +73,8 @@ Everything below was measured on real hardware, not guessed.
 | `0xAE` | Vertical frequency | `10960` = 109.60 Hz |
 | `0xC0` | Panel usage hours | read-only |
 
-The XL2430 has **87** readable VCPs in total. See [`docs/VCP-MAP.md`](docs/VCP-MAP.md).
+The XL2430 has **87** readable VCPs in total. See [`docs/VCP-MAP.md`](docs/VCP-MAP.md)
+and, for what the firmware itself declares, [`docs/CAPABILITIES.md`](docs/CAPABILITIES.md).
 
 > These are proprietary. BenQ reuses standard VCP codes with its own meanings, and values differ between models and firmware revisions. **Do not write to codes you have not read first.**
 
