@@ -30,6 +30,12 @@ documented here; the rest are either read-only identifiers or unknown.
 Toggling it `0 → 1` is what unsticks a scaler that has fallen back to frame
 buffering while still reporting Instant Mode as ON.
 
+**Writes commit asynchronously.** Right after writing `0xD5 = 1` the register can
+still read `0` for up to about two seconds. Any code that writes and immediately
+reads back will conclude the write failed. Always verify with a delay, and never
+fire a `0 → 1` edge less than ~700 ms after the `1 → 0`, or the edge is lost and
+Instant Mode ends up OFF — which silently disables the vertical total.
+
 ---
 
 ## Image controls

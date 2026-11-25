@@ -94,11 +94,26 @@ class Program
 
     // The whole reason this program exists. Writing 1 on a register that already
     // reads 1 is a no-op for the firmware, so the edge 0 -> 1 is mandatory.
+    //
+    // This monitor commits a VCP write asynchronously: right after writing 1 the
+    // register can still read 0 for up to ~2 s. Firing the second edge too early
+    // loses it and leaves Instant Mode OFF (and the vertical total ignored), so
+    // the pulse is verified and retried.
     static void PulseInstant(IntPtr h)
     {
         SetVCPFeature(h, VCP_INSTANT, 0);
-        Thread.Sleep(400);
-        SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
+        Thread.Sleep(700);
+
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
+            Thread.Sleep(600);
+
+            uint cur;
+            if (Read(h, VCP_INSTANT, out cur) && cur == INSTANT_ON) return;
+        }
+
+        Log("AVISO: Instant Mode nao confirmou ON");
     }
 
     static void RestoreState(IntPtr h, int idx)

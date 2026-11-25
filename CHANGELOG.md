@@ -16,6 +16,11 @@ afternoon, so the version numbers track the actual order of discoveries.
   e os ciclos de NVRAM de 11 para 3.
 - `needRelock` também arma no primeiro start, então o logon já corrige um
   estado herdado de um boot anterior.
+- **Pulso verificado.** Medido: o monitor aplica um write de VCP de forma
+  assíncrona — logo após escrever `1` no `0xD5` ele ainda lê `0` por até ~2 s.
+  Com o intervalo de 400 ms o segundo pulso era perdido e o Instant Mode ficava
+  em `0`, ou seja, o VT sendo ignorado. O pulso agora espera 700 ms, escreve,
+  espera 600 ms, lê e repete até confirmar (máx. 4 tentativas).
 
 ## v8
 
