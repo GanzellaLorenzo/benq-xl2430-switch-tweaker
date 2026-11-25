@@ -27,9 +27,14 @@ Fix, in order:
    by hand.
 
 The keeper handles this automatically: when DDC stops answering it arms
-`needRelock`, and on the first successful read after that it waits 900 ms,
-pulses Instant Mode and reasserts the profile. Measured at 2.0 s from wake to
-correct image.
+`needRelock`, and on the first successful read after that it pulses Instant
+Mode (with 2.5 s between the edges) and reasserts profile 1. Measured at 4.9 s
+from wake to correct image.
+
+At boot it does the same, plus a **second relock 25 s later**. The graphics
+driver applies the display mode some seconds after logon, which can latch the
+scaler again right after the first relock. If the machine still starts doubled,
+the second pulse is too early — raise `SECOND_RELOCK_MS`.
 
 ---
 

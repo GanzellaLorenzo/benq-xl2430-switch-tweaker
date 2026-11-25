@@ -26,6 +26,11 @@ afternoon, so the version numbers track the actual order of discoveries.
   no wake. Resultado: aperto de botão em 0,90 s (era 1,9 s no original) e wake
   em 4,9 s.
 
+- **Segundo relock 25 s depois.** No boot o driver de vídeo ainda aplica o modo
+  depois do logon, e isso trava o scaler de novo logo após o primeiro relock.
+  Um segundo pulso 25 s depois cobre essa janela. Reportado como "o PC às vezes
+  inicia com a imagem dupla".
+
 ## v8
 
 - Reassert **AMA High** (`0xF0 = 1`) and **Display Mode Full** (`0x86 = 2`) on

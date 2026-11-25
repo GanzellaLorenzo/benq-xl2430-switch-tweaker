@@ -42,6 +42,7 @@ class Program
     const int POLL_MS = 700;
     const int AUTO_EVERY = 5;
     const int SETTLE_MS = 500;
+    const int SECOND_RELOCK_MS = 25000;   // o driver termina de aplicar o modo depois do logon
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
     static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
@@ -174,7 +175,7 @@ class Program
         Log("iniciado v10  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
-        int retryAt = 0;
+        int retryAt = 0, secondRelockAt = 0;
         bool needRelock = true;   // primeira conexao tambem relocka
         var sw = new Stopwatch();
 
@@ -207,7 +208,20 @@ class Program
                     Thread.Sleep(SETTLE_MS);
                     RestoreState(h, 0, true);
                     needRelock = false;
+                    secondRelockAt = Environment.TickCount + SECOND_RELOCK_MS;
                     Log("relock concluido");
+
+                    // No boot o driver ainda pode aplicar o modo depois do logon e
+                    // travar o scaler de novo. Um segundo pulso um pouco depois
+                    // cobre essa janela. Depois de um wake isso raramente e preciso,
+                    // mas o custo e de uma vez so.
+                }
+                else if (secondRelockAt != 0 && Environment.TickCount >= secondRelockAt)
+                {
+                    secondRelockAt = 0;
+                    Log("relock de confirmacao");
+                    RestoreState(h, 0, true);
+                    Log("relock de confirmacao concluido");
                 }
                 else if (cur != MODE_STANDARD)
                 {
