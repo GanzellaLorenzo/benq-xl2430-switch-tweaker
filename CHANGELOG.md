@@ -16,11 +16,15 @@ afternoon, so the version numbers track the actual order of discoveries.
   e os ciclos de NVRAM de 11 para 3.
 - `needRelock` também arma no primeiro start, então o logon já corrige um
   estado herdado de um boot anterior.
-- **Pulso verificado.** Medido: o monitor aplica um write de VCP de forma
-  assíncrona — logo após escrever `1` no `0xD5` ele ainda lê `0` por até ~2 s.
-  Com o intervalo de 400 ms o segundo pulso era perdido e o Instant Mode ficava
-  em `0`, ou seja, o VT sendo ignorado. O pulso agora espera 700 ms, escreve,
-  espera 600 ms, lê e repete até confirmar (máx. 4 tentativas).
+- **Pulso lento, e só no wake.** Medido: o monitor aplica um write de VCP de
+  forma assíncrona e o **scaler** leva ~2 s para processar o `0`. Com 700 ms o
+  segundo pulso caía no vazio: o registrador ia para `1`, mas a imagem continuava
+  dupla. Confirmado em hardware que **2500 ms** entre as bordas realmente
+  destrava o scanout.
+
+  Como a troca de modo já reaplica o timing, o pulso passou a rodar **somente**
+  no wake. Resultado: aperto de botão em 0,90 s (era 1,9 s no original) e wake
+  em 4,9 s.
 
 ## v8
 

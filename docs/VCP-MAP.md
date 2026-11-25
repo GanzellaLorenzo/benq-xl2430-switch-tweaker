@@ -30,11 +30,18 @@ documented here; the rest are either read-only identifiers or unknown.
 Toggling it `0 → 1` is what unsticks a scaler that has fallen back to frame
 buffering while still reporting Instant Mode as ON.
 
-**Writes commit asynchronously.** Right after writing `0xD5 = 1` the register can
-still read `0` for up to about two seconds. Any code that writes and immediately
-reads back will conclude the write failed. Always verify with a delay, and never
-fire a `0 → 1` edge less than ~700 ms after the `1 → 0`, or the edge is lost and
-Instant Mode ends up OFF — which silently disables the vertical total.
+**Writes commit asynchronously, and the scaler is slower than the register.**
+
+Two distinct delays were measured:
+
+| Stage | Delay |
+|---|---|
+| register read-back after a write | up to ~2 s |
+| scaler actually acting on the `0 → 1` edge | ~2.5 s after the `1 → 0` |
+
+With a 700 ms gap the register ended at `1` but the image stayed doubled — the
+edge never reached the scaler. A **2500 ms** gap is what was verified to clear
+it. Do not tune this down without checking the image, not just the register.
 
 ---
 

@@ -41,7 +41,7 @@ class Program
 
     const int POLL_MS = 700;
     const int AUTO_EVERY = 5;
-    const int SETTLE_MS = 900;
+    const int SETTLE_MS = 500;
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
     static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
@@ -99,15 +99,20 @@ class Program
     // register can still read 0 for up to ~2 s. Firing the second edge too early
     // loses it and leaves Instant Mode OFF (and the vertical total ignored), so
     // the pulse is verified and retried.
+    // Measured on hardware: a 700 ms gap is not enough — the scaler needs about
+    // two seconds to commit the 0 before it will register the edge. With a short
+    // gap the write is lost, Instant Mode stays OFF and the vertical total is
+    // silently ignored. 2500 ms is the value that was verified to actually
+    // clear the double image.
     static void PulseInstant(IntPtr h)
     {
         SetVCPFeature(h, VCP_INSTANT, 0);
-        Thread.Sleep(700);
+        Thread.Sleep(2500);
 
-        for (int attempt = 0; attempt < 4; attempt++)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
             SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
-            Thread.Sleep(600);
+            Thread.Sleep(1200);
 
             uint cur;
             if (Read(h, VCP_INSTANT, out cur) && cur == INSTANT_ON) return;
@@ -116,7 +121,7 @@ class Program
         Log("AVISO: Instant Mode nao confirmou ON");
     }
 
-    static void RestoreState(IntPtr h, int idx)
+    static void RestoreState(IntPtr h, int idx, bool pulse)
     {
         uint mode;
         if (Read(h, VCP_MODE, out mode) && mode != MODE_STANDARD)
@@ -125,8 +130,14 @@ class Program
             Thread.Sleep(180);
         }
 
-        PulseInstant(h);
-        Thread.Sleep(120);
+        // A picture mode change already re-applies the timing, so the slow pulse
+        // is only worth its four seconds after a wake, where the scaler really
+        // is latched. Pressing a button does not need it.
+        if (pulse)
+        {
+            PulseInstant(h);
+            Thread.Sleep(120);
+        }
 
         SetIfDiffers(h, VCP_BLUR, BLUR_ON);
         SetIfDiffers(h, VCP_AREA, PROFILE_AREA[idx]);
@@ -142,7 +153,7 @@ class Program
         if (idx < 0 || idx > 2) { Log("preset desconhecido " + mode + " -> perfil 1"); idx = 0; }
 
         Log("botao " + (idx + 1) + " -> " + PROFILE_NAME[idx]);
-        RestoreState(h, idx);
+        RestoreState(h, idx, false);
         Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full Gamma5");
     }
 
@@ -160,7 +171,7 @@ class Program
 
     static void Run()
     {
-        Log("iniciado v9  poll=" + POLL_MS + "ms");
+        Log("iniciado v10  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
         int retryAt = 0;
@@ -194,7 +205,7 @@ class Program
                 {
                     Log("monitor voltou -> relock do scanout");
                     Thread.Sleep(SETTLE_MS);
-                    RestoreState(h, 0);
+                    RestoreState(h, 0, true);
                     needRelock = false;
                     Log("relock concluido");
                 }
