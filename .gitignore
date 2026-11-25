@@ -1,0 +1,18 @@
+# build output
+*.exe
+*.pdb
+*.mdb
+
+# logs / local state
+*.log
+xlkeeper.pause
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# editors
+.vs/
+.vscode/
+*.user
