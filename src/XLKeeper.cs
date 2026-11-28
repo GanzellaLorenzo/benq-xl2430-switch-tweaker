@@ -46,7 +46,11 @@ class Program
     const int FAILS_TO_ARM = 21;          // ~15 s de DDC caido antes de armar relock
 
     // Perfil por botao: indice 0 = Gamer 1 (24), 1 = Gamer 2 (25), 2 = Gamer 3 (26)
-    static readonly uint[] PROFILE_AREA = { 48, 44, 40 };
+    // Area + (26 - Intensity) must stay <= 6000 / refresh (54 at 110 Hz).
+    // Area also sets where the crosstalk band sits: higher area pushes it to the
+    // bottom edge, lower area drags it into view. So each profile keeps Area as
+    // high as its duty allows.
+    static readonly uint[] PROFILE_AREA = { 48, 46, 44 };
     static readonly uint[] PROFILE_INTENSITY = { 20, 18, 16 };
     static readonly string[] PROFILE_NAME = { "FPS nitido 1.00ms", "Dia 1.33ms", "Claro 1.67ms" };
 
@@ -94,6 +98,21 @@ class Program
         SetVCPFeature(h, code, want);
     }
 
+    // The scaler drops writes that arrive while it is still applying the previous
+    // change. This bit us on Area/Intensity: pressing 3 logged "applied 44/16" and
+    // left 48/20 on screen, so all three profiles looked identical. Verify and retry.
+    static void SetVerified(IntPtr h, byte code, uint want)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            uint cur;
+            if (Read(h, code, out cur) && cur == want) return;
+            SetVCPFeature(h, code, want);
+            Thread.Sleep(220);
+        }
+        Log("AVISO: VCP 0x" + code.ToString("X2") + " nao confirmou " + want);
+    }
+
     // The whole reason this program exists. Writing 1 on a register that already
     // reads 1 is a no-op for the firmware, so the edge 0 -> 1 is mandatory.
     //
@@ -108,16 +127,16 @@ class Program
     // clear the double image.
     static void PulseInstant(IntPtr h)
     {
-        SetVCPFeature(h, VCP_INSTANT, 0);
-        Thread.Sleep(2500);
-
         for (int attempt = 0; attempt < 3; attempt++)
         {
+            SetVCPFeature(h, VCP_INSTANT, 0);
+            Thread.Sleep(2500);
             SetVCPFeature(h, VCP_INSTANT, INSTANT_ON);
-            Thread.Sleep(1200);
+            Thread.Sleep(2000);
 
             uint cur;
             if (Read(h, VCP_INSTANT, out cur) && cur == INSTANT_ON) return;
+            Log("instant mode nao confirmou, tentativa " + (attempt + 1));
         }
 
         Log("AVISO: Instant Mode nao confirmou ON");
@@ -129,7 +148,7 @@ class Program
         if (Read(h, VCP_MODE, out mode) && mode != MODE_STANDARD)
         {
             SetVCPFeature(h, VCP_MODE, MODE_STANDARD);
-            Thread.Sleep(180);
+            Thread.Sleep(700);   // o scaler leva ~0.5s para aplicar o modo
         }
 
         // A picture mode change already re-applies the timing, so the slow pulse
@@ -142,8 +161,17 @@ class Program
         }
 
         SetIfDiffers(h, VCP_BLUR, BLUR_ON);
-        SetIfDiffers(h, VCP_AREA, PROFILE_AREA[idx]);
-        SetIfDiffers(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
+        // Se um pulso anterior perdeu a escrita do 1, o Instant Mode fica em 0 e
+        // o VT deixa de ser usado - que e exatamente a imagem dupla. Repara.
+        uint inst;
+        if (Read(h, VCP_INSTANT, out inst) && inst != INSTANT_ON)
+        {
+            Log("instant mode estava em 0, religando");
+            PulseInstant(h);
+        }
+
+        SetVerified(h, VCP_AREA, PROFILE_AREA[idx]);
+        SetVerified(h, VCP_INTENSITY, PROFILE_INTENSITY[idx]);
         SetIfDiffers(h, VCP_AMA, AMA_HIGH);
         SetIfDiffers(h, VCP_DISPMODE, DISPMODE_FULL);
         SetIfDiffers(h, VCP_GAMMA, GAMMA_5);

@@ -5,6 +5,16 @@ afternoon, so the version numbers track the actual order of discoveries.
 
 ---
 
+## v11
+
+- **Escritas verificadas.** O scaler descarta writes que chegam enquanto está
+  aplicando a mudança anterior. Isso fazia o brilho não mudar entre 1/2/3 (o log
+  dizia `Area=44` e a tela continuava em 48) e fazia o pulso do Instant Mode
+  terminar em `0` — o sintoma idêntico a "Instant Mode off". `SetVerified` lê de
+  volta e repete até confirmar; Area/Intensity usam ele.
+- **Settle de 700 ms** depois da troca de modo (era 180).
+- **Reparo no aperto**: se `0xD5` estiver em `0`, religa antes de aplicar.
+
 ## v9
 
 - **Re-lock automático depois do wake.** O monitor entra em standby e volta com o
