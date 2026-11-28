@@ -57,6 +57,8 @@ class Program
     static readonly string logPath = Path.Combine(Path.GetTempPath(), "xlkeeper.log");
     static readonly string pausePath = Path.Combine(Path.GetTempPath(), "xlkeeper.pause");
 
+    static int secondRelockAt = 0;   // 0 = nenhuma confirmacao pendente
+
     static void Log(string msg)
     {
         try
@@ -90,6 +92,20 @@ class Program
         return GetVCPFeatureAndVCPFeatureReply(h, code, out t, out cur, out m);
     }
 
+    // The monitor's DDC read can return a stale value from its cache, so a single
+    // read is not trustworthy. Two reads that agree, 150 ms apart, are.
+    static bool ReadStable(IntPtr h, byte code, out uint cur)
+    {
+        uint a, b;
+        cur = 0;
+        if (!Read(h, code, out a)) return false;
+        Thread.Sleep(150);
+        if (!Read(h, code, out b)) return false;
+        if (a != b) return false;
+        cur = a;
+        return true;
+    }
+
     // Reads never flicker; writes do. So only write when the value is wrong.
     static void SetIfDiffers(IntPtr h, byte code, uint want)
     {
@@ -103,12 +119,12 @@ class Program
     // left 48/20 on screen, so all three profiles looked identical. Verify and retry.
     static void SetVerified(IntPtr h, byte code, uint want)
     {
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
             uint cur;
-            if (Read(h, code, out cur) && cur == want) return;
+            if (ReadStable(h, code, out cur) && cur == want) return;
             SetVCPFeature(h, code, want);
-            Thread.Sleep(220);
+            Thread.Sleep(320);
         }
         Log("AVISO: VCP 0x" + code.ToString("X2") + " nao confirmou " + want);
     }
@@ -148,7 +164,9 @@ class Program
         if (Read(h, VCP_MODE, out mode) && mode != MODE_STANDARD)
         {
             SetVCPFeature(h, VCP_MODE, MODE_STANDARD);
-            Thread.Sleep(700);   // o scaler leva ~0.5s para aplicar o modo
+            // Enquanto o scaler aplica o modo ele descarta writes. 1.2 s e o
+            // menor valor que se mostrou estavel em uso real.
+            Thread.Sleep(1200);
         }
 
         // A picture mode change already re-applies the timing, so the slow pulse
@@ -162,9 +180,10 @@ class Program
 
         SetIfDiffers(h, VCP_BLUR, BLUR_ON);
         // Se um pulso anterior perdeu a escrita do 1, o Instant Mode fica em 0 e
-        // o VT deixa de ser usado - que e exatamente a imagem dupla. Repara.
+        // o VT deixa de ser usado - que e exatamente a imagem dupla. So repara
+        // quando duas leituras concordam, para nao pulsar por leitura velha.
         uint inst;
-        if (Read(h, VCP_INSTANT, out inst) && inst != INSTANT_ON)
+        if (ReadStable(h, VCP_INSTANT, out inst) && inst != INSTANT_ON)
         {
             Log("instant mode estava em 0, religando");
             PulseInstant(h);
@@ -183,6 +202,9 @@ class Program
         if (idx < 0 || idx > 2) { Log("preset desconhecido " + mode + " -> perfil 1"); idx = 0; }
 
         Log("botao " + (idx + 1) + " -> " + PROFILE_NAME[idx]);
+        // Se voce esta usando o monitor, o boot ja passou: a confirmacao atrasada
+        // so atrapalharia as escritas do perfil.
+        if (secondRelockAt != 0) { secondRelockAt = 0; Log("confirmacao de boot cancelada"); }
         RestoreState(h, idx, false);
         Log("aplicado Area=" + PROFILE_AREA[idx] + " Intensity=" + PROFILE_INTENSITY[idx] + " AMA=High Full Gamma5");
     }
@@ -204,7 +226,7 @@ class Program
         Log("iniciado v10  poll=" + POLL_MS + "ms");
         IntPtr h = IntPtr.Zero;
         int fails = 0, cycle = 0, stuck = 0;
-        int retryAt = 0, secondRelockAt = 0;
+        int retryAt = 0;
         bool needRelock = true;      // primeira conexao tambem relocka
         bool startupRelock = true;   // so o primeiro relock do processo pede confirmacao
         var sw = new Stopwatch();

@@ -5,6 +5,16 @@ afternoon, so the version numbers track the actual order of discoveries.
 
 ---
 
+## v12
+
+- **Leitura estável** (`ReadStable`): o cache DDC devolve valor velho, então uma
+  leitura só não vale. Duas leituras concordando, 150 ms apartadas, valem.
+- **Settle de 1.200 ms** depois da troca de modo (era 700). Abaixo disso o
+  scaler ainda descarta writes.
+- **Confirmação de boot cancelada** se você apertar um botão antes dela. Era ela
+  que atropelava o primeiro perfil depois do logon.
+- Medido: 12 de 12 trocas corretas em 3 rodadas. Custo: ~3,7 s por aperto.
+
 ## v11
 
 - **Escritas verificadas.** O scaler descarta writes que chegam enquanto está
