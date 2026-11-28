@@ -14,7 +14,21 @@ saturated, so the refresh rate has to come down to keep 8 bpc RGB.
 
 ---
 
-## The mode
+## The fast way (no CRU)
+
+```powershell
+# como Administrador
+.\tools\restore-edid.ps1
+```
+
+O script grava o mesmo bloco EDID que o CRU gera direto no registro, valida os
+checksums antes, e força o driver a reler desabilitando/habilitando o dispositivo
+de monitor. Mede o resultado no fim.
+
+É o caminho para depois de formatar o Windows: o override vive no registro, então
+a formatação apaga. Nada é gravado no monitor.
+
+## The manual way (CRU)
 
 Use [ToastyX CRU](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU),
 `Detailed resolutions → Add`:

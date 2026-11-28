@@ -180,6 +180,10 @@ Mode      1920x1080 @ 110 Hz, HT 2001 / VT 1502 (330.61 MHz)
 
 The 110 Hz / VT 1502 mode was built with [ToastyX CRU](https://www.monitortests.com/forum/Thread-Custom-Resolution-Utility-CRU). Recipe in [`docs/CRU-CONFIG.md`](docs/CRU-CONFIG.md).
 
+To recreate it after a Windows reinstall, `tools/restore-edid.ps1` writes the
+same EDID block straight to the registry, validates the checksums, and forces the
+driver to re-read it — no CRU needed.
+
 ---
 
 ## Credit
